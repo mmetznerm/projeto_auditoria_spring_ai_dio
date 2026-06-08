@@ -9,16 +9,28 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PersistTransactionUseCase {
-        private final TransactionRepository repository;
+    private static final String DEFAULT_CREATED_BY = "anonymous";
+
+    private final TransactionRepository repository;
 
     public PersistTransactionUseCase(TransactionRepository repository) {
         this.repository = repository;
     }
 
-    @Tool(name = "persist-transaction", description = "Permite uma nova transação financeira")
+    @Tool(name = "persist-transaction", description = "Permite uma nova transacao financeira")
     public TransactionOutput execute(TransactionInput transactionInput) {
+        var createdBy = transactionInput.createdBy() == null || transactionInput.createdBy().isBlank()
+                ? DEFAULT_CREATED_BY
+                : transactionInput.createdBy();
+
         var transaction = repository.save(
-                new Transaction(transactionInput.description(), transactionInput.amount(), transactionInput.category()));
+                new Transaction(
+                        transactionInput.description(),
+                        transactionInput.amount(),
+                        transactionInput.category(),
+                        createdBy
+                )
+        );
 
         return TransactionOutput.from(transaction);
     }

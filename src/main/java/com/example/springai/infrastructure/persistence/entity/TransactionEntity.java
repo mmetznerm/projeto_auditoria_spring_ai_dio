@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -22,6 +23,8 @@ public class TransactionEntity {
     private UUID id;
     private String description;
     private long amount;
+    private LocalDateTime createdAt;
+    private String createdBy;
 
     @Enumerated(EnumType.STRING)
     private Category category;
@@ -31,6 +34,8 @@ public class TransactionEntity {
                 transaction.getId().id(),
                 transaction.getDescription(),
                 transaction.getAmount(),
+                transaction.getCreatedAt(),
+                transaction.getCreatedBy(),
                 transaction.getCategory()
         );
     }
@@ -40,7 +45,9 @@ public class TransactionEntity {
                 new TransactionId(this.id),
                 this.description,
                 this.amount,
-                this.category
+                this.category,
+                this.createdAt,
+                this.createdBy
         );
     }
 }
