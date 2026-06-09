@@ -12,9 +12,14 @@ public class PersistTransactionUseCase {
     private static final String DEFAULT_CREATED_BY = "anonymous";
 
     private final TransactionRepository repository;
+    private final AudioFileMetadataContext audioFileMetadataContext;
 
-    public PersistTransactionUseCase(TransactionRepository repository) {
+    public PersistTransactionUseCase(
+            TransactionRepository repository,
+            AudioFileMetadataContext audioFileMetadataContext
+    ) {
         this.repository = repository;
+        this.audioFileMetadataContext = audioFileMetadataContext;
     }
 
     @Tool(name = "persist-transaction", description = "Permite uma nova transacao financeira")
@@ -23,14 +28,25 @@ public class PersistTransactionUseCase {
                 ? DEFAULT_CREATED_BY
                 : transactionInput.createdBy();
 
-        var transaction = repository.save(
-                new Transaction(
+        var metadata = audioFileMetadataContext.get();
+
+        var transaction = repository.save(metadata
+                .map(audioFileMetadata -> new Transaction(
+                        transactionInput.description(),
+                        transactionInput.amount(),
+                        transactionInput.category(),
+                        createdBy,
+                        audioFileMetadata.sourceType(),
+                        audioFileMetadata.fileName(),
+                        audioFileMetadata.contentType(),
+                        audioFileMetadata.fileSize()
+                ))
+                .orElseGet(() -> new Transaction(
                         transactionInput.description(),
                         transactionInput.amount(),
                         transactionInput.category(),
                         createdBy
-                )
-        );
+                )));
 
         return TransactionOutput.from(transaction);
     }

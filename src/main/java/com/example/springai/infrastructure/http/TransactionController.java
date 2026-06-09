@@ -1,6 +1,8 @@
 package com.example.springai.infrastructure.http;
 
 import com.example.springai.application.ListByCategoryTransactionUseCase;
+import com.example.springai.application.AudioFileMetadata;
+import com.example.springai.application.AudioFileMetadataContext;
 import com.example.springai.application.PersistTransactionUseCase;
 import com.example.springai.domain.Category;
 import com.example.springai.infrastructure.http.request.TransactionRequest;
@@ -28,18 +30,22 @@ public class TransactionController {
     private final TranscriptionModel transcriptionModel;
     private final ChatClient chatClient;
     private final TextToSpeechModel textToSpeechModel;
+    private final AudioFileMetadataContext audioFileMetadataContext;
 
     public TransactionController(
             PersistTransactionUseCase persistTransactionUseCase,
             ListByCategoryTransactionUseCase listByCategoryTransactionUseCase,
             TranscriptionModel transcriptionModel,
             @Value("classpath:/prompts/system-message.st") Resource systemPrompt,
-            ChatClient.Builder chatClientBuilder, TextToSpeechModel textToSpeechModel
+            ChatClient.Builder chatClientBuilder,
+            TextToSpeechModel textToSpeechModel,
+            AudioFileMetadataContext audioFileMetadataContext
     ) throws IOException {
         this.persistTransactionUseCase = persistTransactionUseCase;
         this.listByCategoryTransactionUseCase = listByCategoryTransactionUseCase;
         this.transcriptionModel = transcriptionModel;
         this.textToSpeechModel = textToSpeechModel;
+        this.audioFileMetadataContext = audioFileMetadataContext;
         this.chatClient = chatClientBuilder
                 .defaultSystem(systemPrompt.getContentAsString(Charset.defaultCharset()))
                 .defaultTools(persistTransactionUseCase, listByCategoryTransactionUseCase)
@@ -60,22 +66,32 @@ public class TransactionController {
 
     @PostMapping(value = "/ai", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = "audio/mp3")
     ResponseEntity<Resource> transcribe(@RequestParam("file") MultipartFile file) {
-        var resources = file.getResource();
-        var userMessage = transcriptionModel.transcribe(resources);
+        audioFileMetadataContext.set(new AudioFileMetadata(
+                "AUDIO_UPLOAD",
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize()
+        ));
 
-        var result = chatClient.prompt().user(userMessage).call().content();
+        try {
+            var resources = file.getResource();
+            var userMessage = transcriptionModel.transcribe(resources);
 
-        byte[] audio = textToSpeechModel.call(result);
-        var resource = new ByteArrayResource(audio);
+            var result = chatClient.prompt().user(userMessage).call().content();
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        ContentDisposition
-                                .attachment()
-                                .filename("audio.mp3")
-                                .build()
-                                .toString())
-                .body(resource);
+            byte[] audio = textToSpeechModel.call(result);
+            var resource = new ByteArrayResource(audio);
 
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            ContentDisposition
+                                    .attachment()
+                                    .filename("audio.mp3")
+                                    .build()
+                                    .toString())
+                    .body(resource);
+        } finally {
+            audioFileMetadataContext.clear();
+        }
     }
 }

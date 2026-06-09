@@ -12,7 +12,11 @@ public record TransactionOutput(
         String category,
         double amount,
         LocalDateTime createdAt,
-        String createdBy
+        String createdBy,
+        String sourceType,
+        String sourceFileName,
+        String sourceContentType,
+        Long sourceFileSize
 ) {
     public static TransactionOutput from(Transaction transaction) {
         return new TransactionOutput(
@@ -21,7 +25,11 @@ public record TransactionOutput(
                 transaction.getCategory().name(),
                 BigDecimal.valueOf(transaction.getAmount()).setScale(2, RoundingMode.HALF_UP).doubleValue(),
                 transaction.getCreatedAt(),
-                transaction.getCreatedBy()
+                transaction.getCreatedBy(),
+                transaction.getSourceType(),
+                transaction.getSourceFileName(),
+                transaction.getSourceContentType(),
+                transaction.getSourceFileSize()
         );
     }
 }

@@ -10,7 +10,11 @@ public record TransactionResponse(
         String description,
         double amount,
         LocalDateTime createdAt,
-        String createdBy
+        String createdBy,
+        String sourceType,
+        String sourceFileName,
+        String sourceContentType,
+        Long sourceFileSize
 ) {
     public static TransactionResponse from(TransactionOutput transaction) {
         return new TransactionResponse(
@@ -19,7 +23,11 @@ public record TransactionResponse(
                 transaction.description(),
                 transaction.amount(),
                 transaction.createdAt(),
-                transaction.createdBy()
+                transaction.createdBy(),
+                transaction.sourceType(),
+                transaction.sourceFileName(),
+                transaction.sourceContentType(),
+                transaction.sourceFileSize()
         );
     }
 }

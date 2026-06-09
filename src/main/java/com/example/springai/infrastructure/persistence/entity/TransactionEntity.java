@@ -25,6 +25,10 @@ public class TransactionEntity {
     private long amount;
     private LocalDateTime createdAt;
     private String createdBy;
+    private String sourceType;
+    private String sourceFileName;
+    private String sourceContentType;
+    private Long sourceFileSize;
 
     @Enumerated(EnumType.STRING)
     private Category category;
@@ -36,6 +40,10 @@ public class TransactionEntity {
                 transaction.getAmount(),
                 transaction.getCreatedAt(),
                 transaction.getCreatedBy(),
+                transaction.getSourceType(),
+                transaction.getSourceFileName(),
+                transaction.getSourceContentType(),
+                transaction.getSourceFileSize(),
                 transaction.getCategory()
         );
     }
@@ -47,7 +55,11 @@ public class TransactionEntity {
                 this.amount,
                 this.category,
                 this.createdAt,
-                this.createdBy
+                this.createdBy,
+                this.sourceType,
+                this.sourceFileName,
+                this.sourceContentType,
+                this.sourceFileSize
         );
     }
 }
