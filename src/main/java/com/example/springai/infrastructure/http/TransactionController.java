@@ -3,9 +3,11 @@ package com.example.springai.infrastructure.http;
 import com.example.springai.application.ListByCategoryTransactionUseCase;
 import com.example.springai.application.AudioFileMetadata;
 import com.example.springai.application.AudioFileMetadataContext;
+import com.example.springai.application.AudioProcessingLogService;
 import com.example.springai.application.PersistTransactionUseCase;
 import com.example.springai.domain.Category;
 import com.example.springai.infrastructure.http.request.TransactionRequest;
+import com.example.springai.infrastructure.http.response.AudioProcessingLogResponse;
 import com.example.springai.infrastructure.http.response.TransactionResponse;
 import org.springframework.ai.audio.transcription.TranscriptionModel;
 import org.springframework.ai.audio.tts.TextToSpeechModel;
@@ -31,6 +33,7 @@ public class TransactionController {
     private final ChatClient chatClient;
     private final TextToSpeechModel textToSpeechModel;
     private final AudioFileMetadataContext audioFileMetadataContext;
+    private final AudioProcessingLogService audioProcessingLogService;
 
     public TransactionController(
             PersistTransactionUseCase persistTransactionUseCase,
@@ -39,13 +42,15 @@ public class TransactionController {
             @Value("classpath:/prompts/system-message.st") Resource systemPrompt,
             ChatClient.Builder chatClientBuilder,
             TextToSpeechModel textToSpeechModel,
-            AudioFileMetadataContext audioFileMetadataContext
+            AudioFileMetadataContext audioFileMetadataContext,
+            AudioProcessingLogService audioProcessingLogService
     ) throws IOException {
         this.persistTransactionUseCase = persistTransactionUseCase;
         this.listByCategoryTransactionUseCase = listByCategoryTransactionUseCase;
         this.transcriptionModel = transcriptionModel;
         this.textToSpeechModel = textToSpeechModel;
         this.audioFileMetadataContext = audioFileMetadataContext;
+        this.audioProcessingLogService = audioProcessingLogService;
         this.chatClient = chatClientBuilder
                 .defaultSystem(systemPrompt.getContentAsString(Charset.defaultCharset()))
                 .defaultTools(persistTransactionUseCase, listByCategoryTransactionUseCase)
@@ -64,20 +69,30 @@ public class TransactionController {
         return listByCategoryTransactionUseCase.execute(category).stream().map(TransactionResponse::from).toList();
     }
 
+    @GetMapping("/audio-processing-logs")
+    public List<AudioProcessingLogResponse> getAudioProcessingLogs() {
+        return audioProcessingLogService.list().stream().map(AudioProcessingLogResponse::from).toList();
+    }
+
     @PostMapping(value = "/ai", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = "audio/mp3")
     ResponseEntity<Resource> transcribe(@RequestParam("file") MultipartFile file) {
-        audioFileMetadataContext.set(new AudioFileMetadata(
+        var metadata = new AudioFileMetadata(
                 "AUDIO_UPLOAD",
                 file.getOriginalFilename(),
                 file.getContentType(),
                 file.getSize()
-        ));
+        );
+
+        audioFileMetadataContext.set(metadata);
+        var processingLog = audioProcessingLogService.start(metadata);
+        String userMessage = null;
 
         try {
             var resources = file.getResource();
-            var userMessage = transcriptionModel.transcribe(resources);
+            userMessage = transcriptionModel.transcribe(resources);
 
             var result = chatClient.prompt().user(userMessage).call().content();
+            audioProcessingLogService.complete(processingLog.getId(), userMessage, result);
 
             byte[] audio = textToSpeechModel.call(result);
             var resource = new ByteArrayResource(audio);
@@ -90,6 +105,9 @@ public class TransactionController {
                                     .build()
                                     .toString())
                     .body(resource);
+        } catch (RuntimeException exception) {
+            audioProcessingLogService.fail(processingLog.getId(), userMessage, exception.getMessage());
+            throw exception;
         } finally {
             audioFileMetadataContext.clear();
         }
