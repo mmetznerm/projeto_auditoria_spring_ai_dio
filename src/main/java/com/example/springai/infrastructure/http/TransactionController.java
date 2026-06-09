@@ -5,6 +5,7 @@ import com.example.springai.application.AudioFileMetadata;
 import com.example.springai.application.AudioFileMetadataContext;
 import com.example.springai.application.AudioProcessingLogService;
 import com.example.springai.application.GetTransactionSummaryUseCase;
+import com.example.springai.application.ListByPeriodTransactionUseCase;
 import com.example.springai.application.PersistTransactionUseCase;
 import com.example.springai.domain.Category;
 import com.example.springai.infrastructure.http.request.TransactionRequest;
@@ -17,12 +18,14 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -30,6 +33,7 @@ import java.util.List;
 public class TransactionController {
     private final PersistTransactionUseCase persistTransactionUseCase;
     private final ListByCategoryTransactionUseCase listByCategoryTransactionUseCase;
+    private final ListByPeriodTransactionUseCase listByPeriodTransactionUseCase;
     private final GetTransactionSummaryUseCase getTransactionSummaryUseCase;
 
     private final TranscriptionModel transcriptionModel;
@@ -41,6 +45,7 @@ public class TransactionController {
     public TransactionController(
             PersistTransactionUseCase persistTransactionUseCase,
             ListByCategoryTransactionUseCase listByCategoryTransactionUseCase,
+            ListByPeriodTransactionUseCase listByPeriodTransactionUseCase,
             GetTransactionSummaryUseCase getTransactionSummaryUseCase,
             TranscriptionModel transcriptionModel,
             @Value("classpath:/prompts/system-message.st") Resource systemPrompt,
@@ -51,6 +56,7 @@ public class TransactionController {
     ) throws IOException {
         this.persistTransactionUseCase = persistTransactionUseCase;
         this.listByCategoryTransactionUseCase = listByCategoryTransactionUseCase;
+        this.listByPeriodTransactionUseCase = listByPeriodTransactionUseCase;
         this.getTransactionSummaryUseCase = getTransactionSummaryUseCase;
         this.transcriptionModel = transcriptionModel;
         this.textToSpeechModel = textToSpeechModel;
@@ -58,7 +64,12 @@ public class TransactionController {
         this.audioProcessingLogService = audioProcessingLogService;
         this.chatClient = chatClientBuilder
                 .defaultSystem(systemPrompt.getContentAsString(Charset.defaultCharset()))
-                .defaultTools(persistTransactionUseCase, listByCategoryTransactionUseCase, getTransactionSummaryUseCase)
+                .defaultTools(
+                        persistTransactionUseCase,
+                        listByCategoryTransactionUseCase,
+                        listByPeriodTransactionUseCase,
+                        getTransactionSummaryUseCase
+                )
                 .build();
     }
 
@@ -72,6 +83,14 @@ public class TransactionController {
     @GetMapping("/summary")
     public TransactionSummaryResponse getSummary() {
         return TransactionSummaryResponse.from(getTransactionSummaryUseCase.execute());
+    }
+
+    @GetMapping("/period")
+    public List<TransactionResponse> getAllTransactionsByPeriod(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return listByPeriodTransactionUseCase.execute(from, to).stream().map(TransactionResponse::from).toList();
     }
 
     @GetMapping("/{category}")

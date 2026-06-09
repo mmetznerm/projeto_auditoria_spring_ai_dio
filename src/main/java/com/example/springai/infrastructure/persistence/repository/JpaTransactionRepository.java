@@ -6,6 +6,7 @@ import com.example.springai.domain.TransactionRepository;
 import com.example.springai.infrastructure.persistence.entity.TransactionEntity;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,6 +36,15 @@ public class JpaTransactionRepository implements TransactionRepository {
     public List<Transaction> findAllByCategory(Category category) {
         return transactionEntityRepository
                 .findAllByCategory(category)
+                .stream()
+                .map(TransactionEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Transaction> findAllByCreatedAtBetween(LocalDateTime from, LocalDateTime to) {
+        return transactionEntityRepository
+                .findAllByCreatedAtBetweenOrderByCreatedAtDesc(from, to)
                 .stream()
                 .map(TransactionEntity::toDomain)
                 .toList();
