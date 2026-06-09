@@ -4,11 +4,13 @@ import com.example.springai.application.ListByCategoryTransactionUseCase;
 import com.example.springai.application.AudioFileMetadata;
 import com.example.springai.application.AudioFileMetadataContext;
 import com.example.springai.application.AudioProcessingLogService;
+import com.example.springai.application.GetTransactionSummaryUseCase;
 import com.example.springai.application.PersistTransactionUseCase;
 import com.example.springai.domain.Category;
 import com.example.springai.infrastructure.http.request.TransactionRequest;
 import com.example.springai.infrastructure.http.response.AudioProcessingLogResponse;
 import com.example.springai.infrastructure.http.response.TransactionResponse;
+import com.example.springai.infrastructure.http.response.TransactionSummaryResponse;
 import org.springframework.ai.audio.transcription.TranscriptionModel;
 import org.springframework.ai.audio.tts.TextToSpeechModel;
 import org.springframework.ai.chat.client.ChatClient;
@@ -28,6 +30,7 @@ import java.util.List;
 public class TransactionController {
     private final PersistTransactionUseCase persistTransactionUseCase;
     private final ListByCategoryTransactionUseCase listByCategoryTransactionUseCase;
+    private final GetTransactionSummaryUseCase getTransactionSummaryUseCase;
 
     private final TranscriptionModel transcriptionModel;
     private final ChatClient chatClient;
@@ -38,6 +41,7 @@ public class TransactionController {
     public TransactionController(
             PersistTransactionUseCase persistTransactionUseCase,
             ListByCategoryTransactionUseCase listByCategoryTransactionUseCase,
+            GetTransactionSummaryUseCase getTransactionSummaryUseCase,
             TranscriptionModel transcriptionModel,
             @Value("classpath:/prompts/system-message.st") Resource systemPrompt,
             ChatClient.Builder chatClientBuilder,
@@ -47,13 +51,14 @@ public class TransactionController {
     ) throws IOException {
         this.persistTransactionUseCase = persistTransactionUseCase;
         this.listByCategoryTransactionUseCase = listByCategoryTransactionUseCase;
+        this.getTransactionSummaryUseCase = getTransactionSummaryUseCase;
         this.transcriptionModel = transcriptionModel;
         this.textToSpeechModel = textToSpeechModel;
         this.audioFileMetadataContext = audioFileMetadataContext;
         this.audioProcessingLogService = audioProcessingLogService;
         this.chatClient = chatClientBuilder
                 .defaultSystem(systemPrompt.getContentAsString(Charset.defaultCharset()))
-                .defaultTools(persistTransactionUseCase, listByCategoryTransactionUseCase)
+                .defaultTools(persistTransactionUseCase, listByCategoryTransactionUseCase, getTransactionSummaryUseCase)
                 .build();
     }
 
@@ -62,6 +67,11 @@ public class TransactionController {
     public TransactionResponse createTransaction(@RequestBody TransactionRequest request) {
         var transaction = persistTransactionUseCase.execute(request.toInput());
         return TransactionResponse.from(transaction);
+    }
+
+    @GetMapping("/summary")
+    public TransactionSummaryResponse getSummary() {
+        return TransactionSummaryResponse.from(getTransactionSummaryUseCase.execute());
     }
 
     @GetMapping("/{category}")

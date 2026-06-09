@@ -6,6 +6,7 @@ import com.example.springai.domain.TransactionRepository;
 import com.example.springai.infrastructure.persistence.entity.TransactionEntity;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Repository
@@ -21,6 +22,13 @@ public class JpaTransactionRepository implements TransactionRepository {
     public Transaction save(Transaction transaction) {
         var entity = TransactionEntity.from(transaction);
         return transactionEntityRepository.save(entity).toDomain();
+    }
+
+    @Override
+    public List<Transaction> findAll() {
+        var transactions = new ArrayList<Transaction>();
+        transactionEntityRepository.findAll().forEach(entity -> transactions.add(entity.toDomain()));
+        return transactions;
     }
 
     @Override
